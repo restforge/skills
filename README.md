@@ -97,8 +97,23 @@ install steps needed.
 
 ## Usage
 
-Once installed, just describe what you want to build in plain language.
-Claude will load the RESTForge skill automatically and guide you through the steps:
+### Starting a new workflow
+
+At the beginning of a new Claude Code session, explicitly invoke the skill to load
+the full RESTForge workflow context:
+
+```
+/restforge:restforge-skills
+```
+
+Then describe what you want to build. Claude will guide you through each step
+in the correct order — from project setup to schema definition, code generation,
+and runtime.
+
+### Continuing mid-conversation
+
+Once the skill is active, just chat naturally. You do not need to invoke the skill
+again — Claude picks up from where you left off:
 
 ```
 I want to set up a new RESTForge project with PostgreSQL
@@ -113,11 +128,9 @@ Generate a frontend app for the orders and customers endpoints
 Migrate the database schema after I updated the SDF file
 ```
 
-To start the RESTForge workflow explicitly:
-
-```
-/restforge:restforge-skills
-```
+The skill also loads automatically when Claude detects RESTForge-related keywords
+in your message (SDF, RDF, UDF, codegen, payload, endpoint, etc.) — even without
+explicit invocation.
 
 ---
 
@@ -130,6 +143,22 @@ To start the RESTForge workflow explicitly:
 | Frontend application | HTML/JS/CSS CRUD pages and dashboards — from a UI definition |
 
 Supports PostgreSQL, MySQL, Oracle, and SQLite.
+
+---
+
+## Uninstall
+
+To remove the plugin, run the following commands inside Claude Code chat:
+
+```
+/plugin uninstall restforge
+```
+
+Then remove the marketplace source:
+
+```
+/plugin marketplace remove restforge/skills
+```
 
 ---
 
