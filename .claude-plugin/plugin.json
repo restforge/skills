@@ -1,0 +1,19 @@
+{
+  "name": "restforge",
+  "version": "0.1.0",
+  "description": "RESTForge end-to-end workflow skill + RESTForge MCP server (61 tools) for Claude Code.",
+  "author": {
+    "name": "RESTForge",
+    "url": "https://restforge.dev"
+  },
+  "repository": "https://github.com/restforge/skills",
+  "license": "MIT",
+  "keywords": [
+    "restforge",
+    "sdf",
+    "dbschema",
+    "codegen",
+    "rest-api",
+    "mcp"
+  ]
+}

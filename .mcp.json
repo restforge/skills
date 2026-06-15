@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "restforge": {
+      "command": "restforge-mcp"
+    }
+  }
+}
