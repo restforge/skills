@@ -1,46 +1,83 @@
 # RESTForge — Claude Code Plugin
 
-Claude Code plugin for RESTForge, a definition-first deterministic REST API generation framework (SDF). One install delivers two layers at once:
+[RESTForge](https://restforge.dev) is a definition-first REST API generation framework.
+You write a JSON definition file — RESTForge generates a complete, production-ready
+backend (database schema + REST endpoints) and frontend (HTML/JS/CSS) from it.
+No boilerplate, no hand-coding repetitive CRUD.
 
-1. **Skill** — end-to-end RESTForge workflow guidance (operation sequence, grounding-first rules, safety guardrails).
-2. **MCP server** — automatic registration of `@restforgejs/mcp-server` (61 tools) into Claude Code.
+This plugin connects RESTForge to Claude Code so you can build entire applications
+through conversation.
+
+**What you get after installing this plugin:**
+
+- **Skill** — Claude understands the full RESTForge workflow end-to-end: project setup,
+  schema definition, database migration, endpoint generation, frontend generation,
+  and runtime management. Claude knows the correct order of operations and will
+  guide you through each step.
+- **MCP server** — 61 RESTForge tools are registered into Claude Code automatically,
+  giving Claude direct access to execute RESTForge operations on your behalf.
 
 ---
 
 ## Prerequisites
 
-- **Node.js >= 18** and **npm >= 9**.
-- **MCP server** installed globally:
+Before installing the plugin, make sure the following are in place:
 
-  ```bash
-  npm install -g @restforgejs/mcp-server
-  ```
+**1. Node.js >= 18 and npm >= 9**
 
-- A valid **RESTForge license key** for `codegen_*` / `runtime_*` operations.
+**2. RESTForge MCP server** — install globally so Claude Code can start it:
 
-> **Alternative without global install:** replace the contents of `.mcp.json` with:
+```bash
+npm install -g @restforgejs/mcp-server
+```
+
+> **No global install?** You can use `npx` instead. After installing this plugin,
+> open `.claude/plugins/restforge/.mcp.json` and replace its content with:
 > ```json
 > { "mcpServers": { "restforge": { "command": "npx", "args": ["-y", "@restforgejs/mcp-server"] } } }
 > ```
+
+**3. A valid RESTForge license key**
+
+Required for schema migration, endpoint generation, frontend generation, and runtime
+operations. Get a license at [restforge.dev](https://restforge.dev).
 
 ---
 
 ## Installation
 
-Inside Claude Code, run the following two commands:
+Open Claude Code and run these two commands in the chat — **not in a terminal**:
 
+**Step 1 — Register the RESTForge plugin source:**
 ```
 /plugin marketplace add restforge/skills
+```
+
+**Step 2 — Install the plugin:**
+```
 /plugin install restforge@restforge-skills
 ```
 
-Restart the Claude Code session after installation.
+When prompted, choose the installation scope:
+- **Install for you (user scope)** — available on your machine across all projects *(recommended for personal use)*
+- **Install for all collaborators on this repository (project scope)** — shared via the repo's `.claude/settings.json`
+- **Install for you, in this repo only (local scope)** — active only in the current project
+
+**Step 3 — Apply the plugin:**
+```
+/reload-plugins
+```
+
+> Both Step 1 and Step 2 are required. Step 1 tells Claude Code where to find the
+> RESTForge plugin; Step 2 installs it. Skipping Step 1 will result in
+> "Marketplace not found" when running Step 2.
 
 ---
 
-## Team installation
+## Team Installation
 
-To automatically distribute the plugin to all team members when they open a repo, add the following to `.claude/settings.json` inside the project repository:
+To automatically provide the plugin to everyone who opens a shared repository,
+commit the following to `.claude/settings.json` in the project root:
 
 ```json
 {
@@ -53,23 +90,46 @@ To automatically distribute the plugin to all team members when they open a repo
 }
 ```
 
+Team members get the plugin automatically when they open the repo — no manual
+install steps needed.
+
 ---
 
 ## Usage
 
-Simply describe the task in natural language — the skill loads automatically when relevant:
+Once installed, just describe what you want to build in plain language.
+Claude will load the RESTForge skill automatically and guide you through the steps:
 
 ```
-Set up a new RESTForge project at ./api with PostgreSQL
-Create a CRUD endpoint for the orders table
-Validate the SDF before migrating to the database
+I want to set up a new RESTForge project with PostgreSQL
+```
+```
+Create a CRUD endpoint for a products table with name, price, and stock fields
+```
+```
+Generate a frontend app for the orders and customers endpoints
+```
+```
+Migrate the database schema after I updated the SDF file
 ```
 
-Explicit invocation:
+To start the RESTForge workflow explicitly:
 
 ```
 /restforge:restforge-skills
 ```
+
+---
+
+## What Can RESTForge Generate?
+
+| Output | Description |
+|---|---|
+| Database schema (DDL) | Tables, columns, indexes, foreign keys — from a JSON schema definition |
+| REST API endpoints | Full CRUD, workflow, master-detail, aggregate, import/export — from a payload definition |
+| Frontend application | HTML/JS/CSS CRUD pages and dashboards — from a UI definition |
+
+Supports PostgreSQL, MySQL, Oracle, and SQLite.
 
 ---
 
