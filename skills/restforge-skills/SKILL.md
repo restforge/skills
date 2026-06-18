@@ -193,7 +193,9 @@ field types that do not exist, invalid constraints, or wrong ordering.
 - **DB already exists** → `codegen_dbschema_introspect` to generate SDF from
   the actual schema.
 - **Starting from a UI design** (HTML mockup, screenshot, image, Figma export)
-  → classify the design into stored / derived / relation / audit elements,
+  → first confirm the design is an entity to model, not a dashboard/analytics
+  screen (those map to the Dashboard RDF pipeline below, not to a new SDF
+  table). Then classify into stored / derived / relation / audit elements,
   produce a draft SDF, then `codegen_dbschema_validate`. The design shows
   presentation, not storage — do not read every visible label as a column.
   → See references/design-to-sdf.md for the classification procedure.

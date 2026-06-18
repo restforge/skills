@@ -1,8 +1,32 @@
 # Reference: Design-to-SDF Heuristics
 
-Use when the input is a UI design — an HTML mockup, a screenshot/image, or a
-Figma export — and the goal is to derive an SDF (Schema Definition File) table
-structure from it.
+Use when the goal is to derive an SDF (Schema Definition File) table structure
+from an external source. Exactly 5 source kinds are in scope — anything else
+is out of scope and must be refused rather than guessed at:
+
+| Source kind | Examples | Path |
+|---|---|---|
+| HTML | a UI mockup/template file | Inference path — Step 0-5 below |
+| Image | screenshot, photo, pasted clipboard image (jpg/png) | Inference path — Step 0-5 below |
+| JSON | sample API response, Figma API/plugin export | Direct-translation, low inference |
+| Markdown | a written schema spec/data-dictionary document | Direct-translation, low inference |
+| SQL DDL | `CREATE TABLE` statements/script, no live DB required | Direct-translation — see dedicated section below |
+
+A "Figma export" is not its own category — it surfaces as either an Image
+(screenshot/PNG export) or JSON (Figma API/plugin export), handled under
+whichever of those two it actually is.
+
+HTML and Image need **inference**: presentation must be classified into
+stored/derived/snapshot/joined/relation/audit before any column is decided
+(Step 0-5 below). JSON, Markdown, and SQL DDL are **already explicit** about
+types and constraints — the work is mostly direct translation to catalog
+syntax, with far less judgment-call risk. Do not run the Step 0-5
+classification ceremony on these; map what is already stated.
+
+Any source outside these 5 kinds (PDF requirements doc, verbal description,
+ERD diagram tool export not covered above, etc.) is out of scope for this
+reference — say so explicitly and ask how to proceed rather than improvising
+a procedure for it.
 
 This reference does NOT replace the catalog. It is a classification procedure
 that produces a **draft** SDF. The draft is always grounded against
@@ -28,6 +52,43 @@ of things that map very differently to a schema:
 
 Reading every visible label as a column is the most common error. Classify
 first, then assign types.
+
+---
+
+## Step 0 — Confirm this is an SDF case at all
+
+Not every design implies a new table. A **dashboard/analytics screen** maps to
+the Dashboard RDF pipeline (`codegen_get_dashboard_catalog` →
+`codegen_create_dashboard`, payload with `widgets` not `tableName`, page name
+prefixed `dash-`), NOT to a new SDF table. Treating its numbers as columns
+produces a fictitious table — e.g. a `dashboard` model with fields like
+`sales`, `purchases`, `profit` is always wrong; those are query results, not
+data ever written by an insert/update.
+
+Signals that the source is a dashboard, not an entity to model:
+- a global filter that parameterizes the whole view — a date range, a
+  cross-entity dropdown (e.g. "Filter by warehouse") — rather than a filter
+  scoped to one entity's list,
+- stat cards / KPI tiles showing currency or count aggregates (Sales,
+  Purchases, Profit, Total Due) with no per-card edit affordance,
+  - a chart, especially a time-series one,
+- the absence of all three Step 1 signals (no Add/Edit form, no per-entity
+  filter, no row-level list) in their normal shape.
+
+If any of these are present, stop before running Step 1-5. Instead:
+1. Identify which **already-existing** tables the numbers aggregate from (here:
+   `sale`, `purchase`, `sales_return`, `purchase_return`, `invoice`,
+   `warehouse`). These need their own SDF only if they don't already exist —
+   derived the normal way (via their own forms/lists), never from the
+   dashboard screen itself.
+2. Ground via `codegen_get_dashboard_catalog`, then build the dashboard payload
+   with SQL widgets querying those tables, filtered by the date range /
+   warehouse parameters shown.
+3. Do not call `codegen_dbschema_init`/`migrate` for the dashboard itself —
+   there is no table to create for it.
+
+A design can mix both: a page with a dashboard section AND a genuine CRUD form
+elsewhere. Apply this gate per-section, not to the whole file at once.
 
 ---
 
@@ -248,6 +309,85 @@ this confirmation.
 
 ---
 
+## SQL DDL source — direct translation path
+
+Applies when the source is `CREATE TABLE` statements (a `.sql` file or a
+pasted script), with or without a live database to run it against. This is
+the lowest-inference path: the DDL already states every type and constraint
+explicitly. Do not run Step 0-5 — translate what is written, syntax to
+syntax, dialect to dialect-agnostic SDF.
+
+### Type mapping
+
+| SQL DDL type | SDF type |
+|---|---|
+| `VARCHAR(n)`, `CHARACTER VARYING(n)`, bounded `CHAR(n)` | `string:n` |
+| `TEXT`, `CLOB`, unbounded `NVARCHAR` | `text` |
+| `INT`, `INTEGER`, `INT4` | `integer` |
+| `BIGINT`, `INT8` | `bigint` |
+| `DECIMAL(p,s)`, `NUMERIC(p,s)` | `decimal:p,s` |
+| `BOOLEAN`, `BOOL`, legacy `TINYINT(1)` flag | `boolean` |
+| `DATE` | `date` |
+| `TIMESTAMP`, `TIMESTAMPTZ`, `DATETIME` | `timestamp` |
+| `UUID`, `UNIQUEIDENTIFIER` | `uuid` |
+| `JSON`, `JSONB` | `json` |
+
+### Constraint mapping
+
+| SQL DDL | SDF |
+|---|---|
+| `PRIMARY KEY` | `pk` |
+| `NOT NULL` | `notnull` |
+| `UNIQUE` | `unique` |
+| non-unique `INDEX`/`KEY` | `index` |
+| `DEFAULT value` | `default:value` — same quoting rule as the catalog: string quoted, numeric/boolean raw, SQL constant bare, function e.g. `now()` |
+| `CHECK (col IN (...))` | `checks: [{ field, in: [...] }]` |
+| `CHECK (col =/!=/>/>=/</<= value)` | `checks: [{ field, eq/neq/gt/gte/lt/lte: value }]` |
+| composite `PRIMARY KEY`/`UNIQUE` (multiple columns) | see `composite-primary-key.md` / `composite-unique.md` in the handbook catalog — do not improvise the syntax |
+
+### Foreign keys — shorthand vs `relations`
+
+Apply the same mutual-exclusivity rule as the catalog (`foreign-keys.md`):
+- `FOREIGN KEY ... REFERENCES table(col)` with no `ON DELETE`/`ON UPDATE`
+  clause (or only the dialect default) → `fk:table.col` shorthand.
+- `FOREIGN KEY ... REFERENCES table(col) ON DELETE x ON UPDATE y` with an
+  explicit, non-default action → a `relations` entry with that `onDelete`/
+  `onUpdate`. Do NOT also write the `fk:` shorthand on the same field — the
+  catalog rejects having both.
+- The reference column is always the **actual column name** named in
+  `REFERENCES table(column)` — this is given explicitly in DDL, so there is no
+  `.id`-guessing risk here (unlike inferring FK targets from a UI dropdown).
+
+### What NOT to add
+
+Unlike the HTML/Image path, DDL is already a deliberate, complete spec from a
+real system — do not apply Step 4's scaffolding defaults on top of it:
+- Do **not** auto-add audit columns (`created_at`/`created_by`/`updated_at`/
+  `updated_by`) if the DDL doesn't have them. Their absence is the source
+  system's actual design, not a gap to fill.
+- Do **not** convert the primary key strategy. If the DDL uses
+  `SERIAL`/`AUTO_INCREMENT`/`GENERATED ALWAYS AS IDENTITY` (integer PK), keep
+  `integer pk` — do not silently switch it to a `string:36` UUID PK because
+  that happens to be the convention used elsewhere.
+
+### Confirm-list additions specific to DDL
+
+- If the DDL already has `is_deleted`/`deleted_at`/`deleted_by` columns, this
+  is a soft-delete table — set `softDelete.enabled: true` and verify the
+  target dialect is PostgreSQL (Phase 1 only); flag a conflict explicitly if
+  the DDL's dialect is MySQL/Oracle/SQLite.
+  - If the DDL's original dialect differs from the project's target dialect
+  (e.g. migrating MySQL DDL into a PostgreSQL project), call out type/storage
+  differences (e.g. MySQL boolean-as-`TINYINT(1)`) — the SDF type stays the
+  dialect-agnostic logical type (`boolean`), the platform handles physical
+  storage per target dialect.
+- Named constraints in the source DDL (`pk_xxx`, `fk_xxx`) are not preserved —
+  RESTForge generates its own deterministic constraint names on migrate. Note
+  this only matters if something outside RESTForge depends on the original
+  constraint names.
+
+---
+
 ## Worked example — categories.html
 
 Design signals: table columns (Category, No of Items, Created On, Status,
@@ -286,3 +426,193 @@ defineModel("category", {
 Confirm before migrate: `category_name` length (255?), `status` option values,
 PK convention (uuid vs serial), and that `No of Items` is intentionally derived,
 not stored.
+
+---
+
+## Worked example — items.html (master-detail + lookup decision)
+
+Design signals: Add Item form (Item Image *, Item Name *, Description *,
+Price *, Net Price *, Category * dropdown, Tax * dropdown); two repeatable
+accordion sections inside the same form — "Variations" (Size *, Price * per
+row) and "Add Ons" (Name *, Price($) * per row); item cards in the list show
+a Veg/Non Veg badge not present anywhere in the Add form.
+
+This source exercises three rules the categories.html example doesn't:
+FK reference correctness, the lookup-master-vs-enum decision on two fields
+from the *same* form, and master-detail decomposition.
+
+Classification:
+- `Item Name`, `Description`, `Price`, `Net Price` → stored, required.
+- `Item Image` → file upload → `string:255`.
+- `Category *` → **FK to a master table**. Decisive signal: a dedicated
+  `categories.html` admin page exists for it elsewhere in the same design set.
+  → `category_id string:36 fk:category.category_id notnull` — the target
+  column is `category.category_id` (the table's actual PK), not `category.id`.
+- `Tax *` → **FK to a master table**, same reasoning — a dedicated
+  `tax-settings.html` page exists. → `tax_id string:36 fk:tax.tax_id notnull`.
+  The `tax` table itself is derived separately from its own admin page (title,
+  rate, tax type), not invented here.
+- `Veg / Non Veg` badge → **enum**, even though it appears only in the list,
+  not the Add form. It's a small, permanent, intrinsic set with no admin page
+  of its own (contrast with `Tax`, which looks similar — a fixed-looking
+  label — but does have one). → `food_type string:20 default:'non_veg'` +
+  `checks: [{ field: 'food_type', in: ['veg', 'non_veg'] }]`.
+- "Variations" accordion (repeatable Size + Price rows) → **master-detail
+  child table**, not columns on `item`. One row in the design = one row in a
+  new `item_variation` table with `item_id` FK back to `item`.
+- "Add Ons" accordion (repeatable Name + Price rows) → same pattern, a second
+  child table `item_addon`.
+
+Resulting draft SDF (four tables — `tax` is shown in outline; the master
+entity and both detail tables in full):
+
+```js
+defineModel("tax", {
+  fields: {
+    tax_id:     "string:36 pk",
+    title:      "string:100 notnull",
+    rate:       "decimal:5,2 notnull",
+    tax_type:   "string:20 notnull default:'exclusive'",
+    created_at: "timestamp default:now()",
+    created_by: "string:100",
+    updated_at: "timestamp",
+    updated_by: "string:100"
+  },
+  checks: [
+    { field: "tax_type", in: ["inclusive_exclusive", "exclusive"] }
+  ]
+});
+
+defineModel("item", {
+  fields: {
+    item_id:     "string:36 pk",
+    category_id: "string:36 fk:category.category_id notnull",
+    item_name:   "string:150 notnull",
+    description: "text notnull",
+    item_image:  "string:255 notnull",
+    food_type:   "string:20 notnull default:'non_veg'",
+    price:       "decimal:10,2 notnull",
+    net_price:   "decimal:10,2 notnull",
+    tax_id:      "string:36 fk:tax.tax_id notnull",
+    created_at:  "timestamp default:now()",
+    created_by:  "string:100",
+    updated_at:  "timestamp",
+    updated_by:  "string:100"
+  },
+  checks: [
+    { field: "food_type", in: ["veg", "non_veg"] }
+  ]
+});
+
+defineModel("item_variation", {
+  fields: {
+    item_variation_id: "string:36 pk",
+    item_id:           "string:36 fk:item.item_id notnull",
+    size_name:         "string:50 notnull",
+    price:             "decimal:10,2 notnull",
+    created_at:        "timestamp default:now()",
+    created_by:        "string:100",
+    updated_at:        "timestamp",
+    updated_by:        "string:100"
+  }
+});
+
+defineModel("item_addon", {
+  fields: {
+    item_addon_id: "string:36 pk",
+    item_id:       "string:36 fk:item.item_id notnull",
+    addon_name:    "string:100 notnull",
+    price:         "decimal:10,2 notnull",
+    created_at:    "timestamp default:now()",
+    created_by:    "string:100",
+    updated_at:    "timestamp",
+    updated_by:    "string:100"
+  }
+});
+```
+
+Confirm before migrate: `item_name`/`item_image` lengths, `food_type` default
+value, whether `tax` needs more fields than the admin page showed, and that
+both accordions are intentionally separate tables rather than columns on
+`item`.
+
+---
+
+## Worked example — Order Details (no-form fallback + joined attribute + snapshot)
+
+Design signals: a read-only "Order Details" page — **no Add/Edit form is
+present in this source**. Panels: Order Info (Date Added, Payment Method,
+Status), Customer Details (Name, Email, Phone, Country, State, Address),
+Order Items (Product, Qty, Unit Price → line Total), summary (Subtotal, Tax,
+Shipping Rate, Grand Total).
+
+This source exercises three rules the previous two examples don't: the
+no-form fallback, the joined-attribute exclusion, and the
+derived-vs-snapshot distinction — including two fields (Address vs
+Name/Email/Phone) that look identical in presentation but classify oppositely.
+
+Classification:
+- **No form in this source** → state that explicitly per the Step 1 fallback,
+  proceed with this detail page as the best available signal rather than
+  silently treating it as equivalent to a form.
+- `Payment Method` → **enum**, not a master table. No admin/settings page or
+  quick-add affordance is present anywhere in this source.
+- `Status` → enum, closed permanent set (`pending`/`processing`/`completed`/
+  `cancelled`).
+- `Customer Name`, `Email`, `Phone` → **joined attribute**. These belong to
+  `customer`, reachable through `customer_id`; not stored on `order`.
+- `Country`, `State`, `Address` → **snapshot**, not joined — even though they
+  look like the same kind of "customer info" as Name/Email/Phone just above
+  them. The deciding question: could the customer's saved address change
+  later while this order must still show where it actually shipped? Yes →
+  must stay frozen on the order record.
+- `Product`, `Qty` → relation (FK to `product`) + stored quantity, on a
+  master-detail child table `order_item` (one row per line, same pattern as
+  `item_variation` in the previous example).
+- `Unit Price` (per line) and `Subtotal`/`Tax`/`Shipping Rate`/`Grand Total`
+  (header summary) → **snapshot**. All are computed, but must not silently
+  change if the product's current price changes after the order is placed.
+
+Resulting draft SDF:
+
+```js
+defineModel("order", {
+  fields: {
+    order_id:         "string:36 pk",
+    order_number:     "string:20 notnull unique",
+    customer_id:      "string:36 fk:customer.customer_id notnull",
+    payment_method:   "string:20 notnull",
+    status:           "string:20 notnull default:'pending'",
+    shipping_address: "text notnull",
+    shipping_country: "string:100 notnull",
+    shipping_state:   "string:100 notnull",
+    subtotal:         "decimal:15,2 notnull",
+    tax_amount:       "decimal:15,2 notnull default:0",
+    shipping_rate:    "decimal:15,2 notnull default:0",
+    grand_total:      "decimal:15,2 notnull",
+    created_at:       "timestamp default:now()",
+    created_by:       "string:100"
+  },
+  checks: [
+    { field: "payment_method", in: ["credit_card", "bank_transfer", "cash", "e_wallet"] },
+    { field: "status", in: ["pending", "processing", "completed", "cancelled"] }
+  ]
+});
+
+defineModel("order_item", {
+  fields: {
+    order_item_id: "string:36 pk",
+    order_id:      "string:36 fk:order.order_id notnull",
+    product_id:    "string:36 fk:product.product_id notnull",
+    qty:           "integer notnull",
+    unit_price:    "decimal:15,2 notnull"
+  }
+});
+```
+
+Confirm before migrate: `payment_method` option set (this source gave no
+admin-page signal — verify with the user whether the real system manages it
+as a master table instead), `order_number` format/length, PK convention, and
+that Name/Email/Phone were intentionally excluded as joined while
+Address/totals were intentionally kept as snapshot — these two decisions look
+similar on the screen but are opposite in the schema.
