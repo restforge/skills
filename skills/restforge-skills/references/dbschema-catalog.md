@@ -51,7 +51,7 @@ decimal:15,2 notnull default:0
 boolean default:true
 string:100 default:'pending'
 timestamp default:now()
-string:36 fk:category.id
+string:36 fk:category.category_id
 string:64 index
 ```
 
@@ -62,7 +62,11 @@ Rules:
 - Value constraints require `constraint:value` format: `default`, `fk`.
 - String default: single-quoted `default:'value'`; numeric/boolean: raw `default:0`;
   SQL constant: bare identifier `default:current_date`; native function: `default:now()`.
-- FK uses dot notation: `fk:<table>.<column>`. Bracket syntax is rejected by the parser.
+- FK uses dot notation: `fk:<table>.<column>`. `<column>` is the **actual
+  column name** of the referenced field in the target table — normally that
+  table's primary key column (e.g. `category.category_id`), NOT a literal `id`.
+  RESTForge does not auto-resolve `.id` to the primary key; a reference to a
+  column that does not exist is rejected. Bracket syntax is rejected by the parser.
 - `autoUpdate` is deprecated — no functional effect, parsed for backward compat only.
 
 ---
@@ -78,7 +82,7 @@ Rules:
 | `unique` | standalone | `string:32 unique` | Single-column UNIQUE |
 | `index` | standalone | `string:64 index` | Single-column non-unique index |
 | `default` | value | `boolean default:true` | Default value |
-| `fk` | value | `string:36 fk:category.id` | FK + auto belongsTo relation |
+| `fk` | value | `string:36 fk:category.category_id` | FK + auto belongsTo relation; target is the actual PK column name |
 
 ---
 

@@ -5,7 +5,8 @@ description: >
   SDF (Schema Definition File), RDF (Resource Definition File), UDF (UI
   Definition File), dbschema, defineModel, codegen, payload, generate endpoint,
   generate dashboard, generate frontend, migrate schema, setup project,
-  codegen_*, designer_*, restforge-designer, @restforgejs/platform, or
+  design-to-SDF, deriving a schema from an HTML mockup / screenshot / image / UI
+  design, codegen_*, designer_*, restforge-designer, @restforgejs/platform, or
   @restforgejs/mcp-server. This skill defines the canonical operation sequence
   for both backend (setup → schema → payload → codegen → runtime) and frontend
   (init → udf → validate → generate), catalog grounding rules, decision
@@ -170,6 +171,7 @@ relevant grounding catalog first.
 | Context | Grounding tool | Reference |
 |---|---|---|
 | Defining or reviewing SDF | `codegen_get_dbschema_catalog` | references/dbschema-catalog.md |
+| Deriving SDF from a UI design (HTML/image) | `codegen_get_dbschema_catalog` | references/design-to-sdf.md |
 | Defining `fieldValidation` in RDF payload | `codegen_get_field_validation_catalog` | references/field-validation.md |
 | Defining queries in RDF payload | `codegen_get_query_declarative_catalog` | — |
 | Defining dashboard payload | `codegen_get_dashboard_catalog` | — |
@@ -190,6 +192,11 @@ field types that do not exist, invalid constraints, or wrong ordering.
   or `codegen_dbschema_template` (minimal template).
 - **DB already exists** → `codegen_dbschema_introspect` to generate SDF from
   the actual schema.
+- **Starting from a UI design** (HTML mockup, screenshot, image, Figma export)
+  → classify the design into stored / derived / relation / audit elements,
+  produce a draft SDF, then `codegen_dbschema_validate`. The design shows
+  presentation, not storage — do not read every visible label as a column.
+  → See references/design-to-sdf.md for the classification procedure.
 - **DB exists with drift** → `codegen_dbschema_diff` to review, then
   `codegen_dbschema_apply`. Not `codegen_dbschema_migrate` — that is for empty DBs only.
 

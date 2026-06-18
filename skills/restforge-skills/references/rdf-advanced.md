@@ -304,24 +304,79 @@ with a `POST multipart/form-data` request.
 
 ## Processor
 
-Adds a custom endpoint outside the standard CRUD pattern. Used for
-business-logic-heavy operations that don't fit a single table action.
+Alternative RDF structure for custom non-CRUD endpoints. A processor payload
+does NOT have `tableName`, `fieldName`, or `action`. Each entry in `processor[]`
+defines one endpoint. Generated with `npx restforge processor create`.
 
 ```json
-"processor": {
-  "action": "recalculate-totals",
-  "sql": "UPDATE order SET total = (SELECT SUM(subtotal) FROM order_item WHERE order_id = :orderId) WHERE order_id = :orderId",
-  "params": [
-    { "name": "orderId", "source": "body", "fieldName": "order_id" }
+{
+  "description": "Sales Order custom endpoints",
+  "processor": [
+    {
+      "name": "submit-order",
+      "method": "POST",
+      "description": "Submit draft order menjadi pending approval",
+      "sql": {
+        "query": "UPDATE sales.sales_order SET status = 'pending_approval' WHERE so_id = $1 AND status = 'draft'",
+        "params": ["so_id"]
+      },
+      "request": {
+        "body": {
+          "so_id": { "type": "uuid", "required": true },
+          "notes": { "type": "string", "required": false, "maxLength": 200 }
+        },
+        "headers": {
+          "X-App-Code": { "type": "string", "required": true, "mapTo": "app_code" }
+        }
+      },
+      "response": {
+        "message": {
+          "success": "Sales order berhasil di-submit untuk approval.",
+          "empty":   "Sales order tidak ditemukan atau bukan berstatus draft.",
+          "error":   "Gagal submit sales order."
+        }
+      }
+    }
   ]
 }
 ```
 
-- `action` — the action name sent in the request body.
-- `sql` — optional inline SQL; use `file:` prefix for external `.sql` files.
-- `params[]` — parameter binding from `body`, `query`, or `header`.
-- When `sql` is omitted, only the processor hook runs (no DB operation from platform).
-- Can be combined with `onBefore`/`onAfter` hooks same as workflow transitions.
+| Property | Required | Notes |
+|---|---|---|
+| `processor[].name` | Yes | Endpoint name — becomes file name and URL segment |
+| `processor[].method` | Yes | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` |
+| `processor[].sql.query` | Conditional | Inline SQL with `$1, $2, ...` placeholders. If `sql` block present, one of `query` or `file` is required |
+| `processor[].sql.file` | Conditional | Path to external `.sql` file, relative to payload folder |
+| `processor[].sql.params` | No | Field names bound to placeholders; resolved from body/params/query/header `mapTo`; falls back to `default` if input empty |
+| `processor[].request.body` | No | Request body field schema |
+| `processor[].request.params` | No | Route params; each key adds `/:key` to the path |
+| `processor[].request.headers` | No | Header schema; use `mapTo` to rename into `input` |
+| `processor[].request.validate` | No | Default `true`. Set `false` to opt-out router-level validation |
+| `processor[].response.message` | No | `success`, `empty` (SQL mode only), `error` messages |
+| `processor[].cache.enabled` | No | Default `false`. Response cache for GET processors |
+| `processor[].cache.ttl` | No | Cache TTL in seconds; default `300` |
+
+**Field schema properties** (apply to `request.body`, `request.params`, `request.headers`):
+
+| Property | Notes |
+|---|---|
+| `type` | `string`, `number`, `integer`, `boolean`, `uuid`, `array`, `object`, `date`, `datetime` |
+| `required` | Router rejects with HTTP 400 if absent |
+| `format` | Regex whitelist: `email`, `url`, `phone-id`, `uuid` |
+| `enum` | Whitelist of allowed values |
+| `minLength` / `maxLength` | Length check for string fields |
+| `sensitive` | `true` masks value as `***MASKED***` in router debug log |
+| `default` | Fallback value for `sql.params` binding when input is empty |
+| `mapTo` | (`headers` only) field name to use in `input` object |
+
+**Generator behavior:**
+- Router (`{endpoint}.js`) — always overwritten on re-run.
+- Processor file (`processor/{endpoint}/{name}.js`) — skipped if already exists (safe to re-run).
+  Use `--force` to overwrite.
+
+**Without sql block** — payload with only `name`, `method`, and `request` is valid.
+Router registers the route with validation; processor file is generated as a manual
+implementation scaffold. Business logic is written in the processor file.
 
 ---
 
@@ -351,21 +406,79 @@ Publishes events to a Kafka topic after CRUD operations. Requires
 
 ## Components (Lifecycle Hooks)
 
-`components` configures engine-level lifecycle hooks for custom business logic.
+`components` configures CRUD lifecycle hooks that execute local JavaScript handler
+files. Added to a standard CRUD payload (one that has `tableName`).
 
 ```json
-"components": {
-  "onBeforeCreate": "http://hooks-service/before-create",
-  "onAfterCreate": "http://hooks-service/after-create",
-  "onBeforeUpdate": "http://hooks-service/before-update",
-  "onAfterUpdate": "http://hooks-service/after-update",
-  "onBeforeDelete": "http://hooks-service/before-delete",
-  "onAfterDelete": "http://hooks-service/after-delete"
+{
+  "components": [
+    {
+      "properties": {
+        "filename": "components/supplier-hooks.js",
+        "methods": [
+          {
+            "name": "validateSupplierCode",
+            "events": "onBeforeInsert",
+            "params": [
+              { "value": "{requestData}" },
+              { "value": "{user_id}" }
+            ]
+          },
+          {
+            "name": "notifySlack",
+            "events": "onAfterInsert"
+          }
+        ]
+      }
+    }
+  ]
 }
 ```
 
-- `onBefore*` hooks — called before the DB operation; returning 4xx/5xx blocks the operation.
-- `onAfter*` hooks — called after the DB operation; failure is logged but does not roll back.
-- Hooks receive the full request payload and the processed record.
-- Used for cross-service side effects, auditing, cache invalidation, or validation
-  that cannot be expressed as field-level constraints.
+| Property | Required | Notes |
+|---|---|---|
+| `components[].properties.filename` | Yes | Path to handler file, relative to project root |
+| `components[].properties.methods` | Yes | List of method bindings |
+| `methods[].name` | Yes | Function name exported from the handler file |
+| `methods[].events` | Yes | Event hook (see table below) |
+| `methods[].params` | No | Template variables forwarded to the handler |
+
+**Supported event hooks:**
+
+| Event | Trigger |
+|---|---|
+| `onBeforeInsert`, `onAfterInsert` | `/create` endpoint |
+| `onBeforeUpdate`, `onAfterUpdate` | `/update` endpoint |
+| `onBeforeDelete`, `onAfterDelete` | `/delete` endpoint |
+| `onBeforeCompositeInsert`, `onAfterCompositeInsert` | `/create-composite` endpoint |
+| `onBeforeCompositeUpdate`, `onAfterCompositeUpdate` | `/update-composite` endpoint |
+
+**Template variables for `params[].value`:**
+
+| Variable | Value |
+|---|---|
+| `{tableName}` | Resource table name |
+| `{requestData}` | Full request body |
+| `{oldData}` | Data before operation (`update`, `delete`) |
+| `{newData}` | Data after operation (`create`, `update`) |
+| `{operation}` | Operation name: `insert` / `update` / `delete` |
+| `{user_id}` | User ID from request context |
+| `{timestamp}` | Execution timestamp |
+| `{record_id}` | Primary key of the affected record |
+
+**Handler file signature** (`src/components/handlers/`):
+
+```javascript
+async function handlerName(/* resolved params... */, services) {
+  const { db, logger, redis, kafka, cache } = services;
+  // business logic
+  return { success: true, message: '...' };
+}
+module.exports = { handlerName };
+```
+
+- `services` is injected automatically as the last argument; no need to declare it
+  in `params[]`.
+- All events are **blocking** — `return { success: false }` or throwing an exception
+  rolls back the entire transaction.
+- If `components` is absent from the payload, CRUD operates normally without hooks.
