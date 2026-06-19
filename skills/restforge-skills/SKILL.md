@@ -142,16 +142,16 @@ API must be running and reachable at `apiBaseUrl` before the frontend is useful.
       One page entry = one CRUD page or one dashboard page.
 
 5.  designer_validate_payload
-      Validate UDF payload. Does not require license. Catches structural
-      errors before generation — run this before preview or generate.
+      Validate UDF payload. Catches structural errors before generation —
+      run this before preview or generate.
 
 6.  designer_preview_files
       Dry-run: list files that would be generated without writing to disk.
-      Requires license. Use to verify scope before overwrite.
+      Use to verify scope before overwrite.
 
 7.  designer_generate
       Generate frontend HTML/JS/CSS from UDF payload. Writes output files.
-      Requires license. Agent stops here — user opens the output in a browser.
+      Agent stops here — user opens the output in a browser.
 ```
 
 For plugin development (custom output plugins):
@@ -291,8 +291,8 @@ expanding scope.
 
 - Node.js ≥ 18
 - Active and reachable database matching the configured `DB_TYPE`
-- Valid RESTForge license key for `codegen_*`, `runtime_*`, `setup_validate_config`,
-  `designer_preview_files`, and `designer_generate`
+- Valid RESTForge license key for `codegen_*`, `runtime_*`, and `setup_validate_config`
+  (Designer tools — `designer_preview_files`, `designer_generate`, etc. — do not require a license)
 - `@restforgejs/mcp-server` installed globally (`npm install -g @restforgejs/mcp-server`)
 - Active Redis if using cache, distributed lock, or live sync
 - Active Kafka if using Kafka consumer (`KAFKA_ENABLED=true`)
@@ -315,4 +315,3 @@ For the full list of 63 parameters, see `references/config-schema.md`.
 | "Widget uses undeclared placeholder" | `:paramName` in SQL not in `params` | Add entry to `params` in dashboard payload |
 | "tableName and widgets conflict" | Payload contains both | Dashboard uses `widgets`; CRUD uses `tableName` |
 | UDF validation error on field type | Field type not supported by active plugin | Run `designer_list_plugins` + `designer_get_udf_catalog` to verify supported types |
-| Designer license error | `designer_preview_files` / `designer_generate` requires license | Activate license via `designer_generate --activate` or check `RESTFORGE_LICENSE` env var |
