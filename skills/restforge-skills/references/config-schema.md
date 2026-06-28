@@ -1,5 +1,10 @@
 # Reference: Config Schema (db-connection.env)
 
+> **Offline mirror.** This file mirrors `setup_get_config_schema` from the
+> installed RESTForge platform. The live tool is authoritative — when this file
+> and the tool disagree, trust the tool, then update this file. Parameter set and
+> defaults can change between platform versions.
+
 Source: `setup_get_config_schema` — installed platform version.
 Total: 63 parameters. Required parameters marked **\***.
 Schema version: 1.0.

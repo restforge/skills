@@ -1,5 +1,10 @@
 # Reference: dbschema-kit Catalog
 
+> **Offline mirror.** This file mirrors `codegen_get_dbschema_catalog` from the
+> installed RESTForge platform. The live tool is authoritative — when this file
+> and the tool disagree, trust the tool, then update this file. Always re-ground
+> with the tool before defining SDF; do not rely on this mirror alone.
+
 Source: `codegen_get_dbschema_catalog` — installed platform version.
 Use as grounding before defining SDF.
 Schema version: 1.1.
@@ -137,6 +142,10 @@ relations: {
 | `gte` | numeric | `{ field: "qty", gte: 0 }` |
 | `lt` | numeric | `{ field: "discount", lt: 100 }` |
 | `lte` | numeric | `{ field: "discount", lte: 100 }` |
+
+> Case enforcement at the DB level (e.g. require `customer_name` to be stored
+> upper case) belongs here as a check, not in RDF `fieldValidation`. RDF
+> `uppercase` only normalizes the value at the API layer.
 
 ---
 

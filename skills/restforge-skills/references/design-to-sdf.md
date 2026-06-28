@@ -1,5 +1,11 @@
 # Reference: Design-to-SDF Heuristics
 
+> **Procedure, not a catalog dump.** This file is a classification procedure that
+> produces a *draft* SDF. It does not replace `codegen_get_dbschema_catalog`:
+> every draft is grounded against the catalog for valid options and MUST pass
+> `codegen_dbschema_validate` before any DDL is generated. Inferences marked
+> "confirm" are guesses — surface them to the user, never commit silently.
+
 Use when the goal is to derive an SDF (Schema Definition File) table structure
 from an external source. Exactly 5 source kinds are in scope — anything else
 is out of scope and must be refused rather than guessed at:
@@ -27,12 +33,6 @@ Any source outside these 5 kinds (PDF requirements doc, verbal description,
 ERD diagram tool export not covered above, etc.) is out of scope for this
 reference — say so explicitly and ask how to proceed rather than improvising
 a procedure for it.
-
-This reference does NOT replace the catalog. It is a classification procedure
-that produces a **draft** SDF. The draft is always grounded against
-`codegen_get_dbschema_catalog` for valid options and MUST pass
-`codegen_dbschema_validate` before any DDL is generated. Inferences marked
-"confirm" below are guesses — surface them to the user, do not silently commit.
 
 ---
 
@@ -479,7 +479,7 @@ defineModel("tax", {
     updated_by: "string:100"
   },
   checks: [
-    { field: "tax_type", in: ["inclusive_exclusive", "exclusive"] }
+    { field: "tax_type", in: ["inclusive", "exclusive"] }
   ]
 });
 

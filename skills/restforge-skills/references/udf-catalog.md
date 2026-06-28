@@ -1,5 +1,11 @@
 # Reference: UDF Catalog (UI Definition File)
 
+> **Offline mirror.** This file mirrors `designer_get_udf_catalog` from the
+> installed RESTForge designer. The live tool is authoritative — when this file
+> and the tool disagree, trust the tool, then update this file. Field types and
+> features depend on the active plugin version; always re-ground with the tool
+> (and `designer_list_plugins`) before defining a UDF payload.
+
 Source: `designer_get_udf_catalog` — installed designer version.
 Use as grounding before defining or editing any UDF payload.
 
@@ -465,14 +471,21 @@ an event over the WebSocket channel.
 
 ## Plugins
 
-Two built-in plugins. Run `designer_list_plugins` to confirm available versions.
+Built-in plugins. Run `designer_list_plugins` to confirm what the installed
+version provides — do not hardcode this list.
 
 | Plugin | Auth | Notes |
 |---|---|---|
 | `vanilla-js-basic` | None | Standard CRUD app, no login flow |
-| `vanilla-js-auth` | JWT | Includes login page, token refresh, role-based visibility |
+| `vanilla-js-auth` | Auth + RBAC | Login page, token refresh, role-based access |
+| `vanilla-js-custom` | Auth + RBAC | Customisable markup/CSS/JS; auth + RBAC capable (confirm via `designer_list_plugins`) |
 
-`vanilla-js-auth` requires additional `appConfig` properties:
+Plugin auth is built into the app at generation time. Disable it with
+`noAuth: true` (`--no-auth`) on `designer_init_project` to get the plugin's UI
+without auth. **Plugin auth (with RBAC) is distinct from the embedded `rfx_auth`
+extension** (`designer_auth_create`, no RBAC) — see references/auth.md.
+
+`vanilla-js-auth` accepts additional `appConfig` / init properties:
 - `authAppCode` — must match the backend auth module's app code
 - `idleTimeout` — auto-logout after inactivity (seconds)
 

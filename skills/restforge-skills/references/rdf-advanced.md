@@ -1,8 +1,12 @@
 # Reference: RDF Advanced Features
 
-Source: `restforge-handbook/catalogs/rdf/` — installed platform version.
+> **Offline mirror.** This file mirrors the RDF catalog of the installed
+> RESTForge platform (`restforge-handbook/catalogs/rdf/`). The live platform is
+> authoritative — when this file and the platform disagree, trust the platform,
+> then update this file. For `fieldValidation` constraints, see
+> `references/field-validation.md`.
+
 This reference covers advanced RDF payload features beyond standard CRUD fields.
-For `fieldValidation` constraints, see `references/field-validation.md`.
 
 ---
 
@@ -315,7 +319,7 @@ defines one endpoint. Generated with `npx restforge processor create`.
     {
       "name": "submit-order",
       "method": "POST",
-      "description": "Submit draft order menjadi pending approval",
+      "description": "Submit a draft order to pending approval",
       "sql": {
         "query": "UPDATE sales.sales_order SET status = 'pending_approval' WHERE so_id = $1 AND status = 'draft'",
         "params": ["so_id"]
@@ -331,9 +335,9 @@ defines one endpoint. Generated with `npx restforge processor create`.
       },
       "response": {
         "message": {
-          "success": "Sales order berhasil di-submit untuk approval.",
-          "empty":   "Sales order tidak ditemukan atau bukan berstatus draft.",
-          "error":   "Gagal submit sales order."
+          "success": "Sales order submitted for approval.",
+          "empty":   "Sales order not found or not in draft status.",
+          "error":   "Failed to submit sales order."
         }
       }
     }

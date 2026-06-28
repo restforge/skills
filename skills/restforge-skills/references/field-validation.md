@@ -1,5 +1,11 @@
 # Reference: Field Validation Catalog
 
+> **Offline mirror.** This file mirrors `codegen_get_field_validation_catalog`
+> from the installed RESTForge platform. The live tool is authoritative — when
+> this file and the tool disagree, trust the tool, then update this file. Always
+> re-ground with the tool before defining content; do not rely on this mirror
+> alone.
+
 Source: `codegen_get_field_validation_catalog` — installed platform version.
 Use as grounding before defining `fieldValidation` in a payload.
 Schema version: 1.0.
@@ -66,6 +72,12 @@ Constraints not listed for a given type will be rejected.
 | `trim` | boolean | — | `"trim": true` |
 | `lowercase` | boolean | — | `"lowercase": true` |
 | `uppercase` | boolean | — | `"uppercase": true` |
+
+> `trim`, `lowercase`, and `uppercase` are **normalization transforms** applied to
+> the stored value, not validators. `uppercase: true` forces the value to upper
+> case; it does not reject non-uppercase input. To *reject* input that is not
+> upper case, use `pattern` (e.g. `"^[A-Z ]+$"`). To enforce case at the database
+> level, use an SDF check constraint, not `fieldValidation`.
 
 ### Number scope (integer, decimal, number)
 
